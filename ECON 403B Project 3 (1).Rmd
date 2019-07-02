@@ -1,0 +1,490 @@
+---
+title: "ECON 403B Project 3"
+author: "John Macke, Pujan Thakrar, Mark Vandre"
+date: "February 28, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+#load in relevant packages and data
+library(ggplot2)
+library(AER)
+library(stargazer)
+library(plm)
+data("USAirlines")
+library(foreign)
+library(gplots)
+library(plm)
+library(AER)
+library(wooldridge)
+
+```
+
+### I Airline Data
+#### Begin by looking at airline data provided by the AER package in USAirlines. The data consists of 25 airline firms with 15 yearly observations from 1970-1984.
+
+#### (a) Keep only firms with a complete set of observations. How many firms are left in this set?
+
+```{r}
+
+table(USAirlines$firm)
+table(USAirlines$year)
+
+```
+
+As can be seen by the table outputs for both the firm and year variable, the data is already a balanced panel.
+
+#### (b) Examine the summary statistics for the variables in the data set.
+
+```{r}
+
+summary(USAirlines)
+
+ggplot(USAirlines)+
+  geom_density(aes(x = output))+
+  facet_wrap(~firm)+
+  geom_rug(aes(x = output))+
+  theme_bw()+
+  labs(
+    title = "Density Distributions of Output",
+    subtitle = "Split by Firm",
+    x = "Output",
+    y = "Density"
+  )
+
+ggplot(USAirlines)+
+  geom_density(aes(x = cost))+
+  facet_wrap(~firm)+
+  geom_rug(aes(x = cost))+
+  theme_bw()+
+  labs(
+    title = "Density Distributions of Costs",
+    subtitle = "Split by Firm",
+    x = "Costs",
+    y = "Density"
+  )
+
+ggplot(USAirlines)+
+  geom_density(aes(x = price))+
+  facet_wrap(~firm)+
+  geom_rug(aes(x = price))+
+  theme_bw()+
+  labs(
+    title = "Density Distributions of Fuel Price",
+    subtitle = "Split by Firm",
+    x = "Price",
+    y = "Density"
+  )
+
+ggplot(USAirlines)+
+  geom_density(aes(x = load))+
+  facet_wrap(~firm)+
+  geom_rug(aes(x = load))+
+  theme_bw()+
+  labs(
+    title = "Density Distributions of Load",
+    subtitle = "Split by Firm",
+    x = "Load",
+    y = "Density"
+  )
+
+```
+
+Above is the summary output for the USAirlines data along with density distribution graphs for each variable by firm. The firm and year summary shows the panel data is balanced with an observation for each of the 6 firms in each of the 15 years covered. From the data documentation, output is an index number representing revenue passenger miles, cost is costs in thousands of US dollars, price is the price of fuel, and load is the average capacity utilization of the airline's fleet. 
+
+For output, airline 1 and 2 have relatively dispersed data while the remaining airlines have concentrated data mostly between 0 and 0.5 this could indicate that airlines 1 and 2 are relatively larger airlines, that they fly relatively larger planes, or both could be true. For costs, the data is distributed similarly to output. firm 1 and two have dispersed distributions while the remaining firms are relatively more concentrated near zero. Not suprisingly, the density curves for price reveal that all firms appear to face the same prices for fuel. The distributions for load show that most of the airlines utilize their fleet toward the upper end of the distribution.
+
+
+#### (c) Estimate the following cost equation where C refers to cost, Q refers to output, and P refers to price.
+
+\[lnC_{i,t} = \beta_1 + \beta_2 lnQ_{i,t} + \beta_3 (lnQ_{i,t})^2 + \beta_4 lnP_{i,t}^{fuel} + \beta_5 load_{i,t}\]
+
+```{r}
+
+costEq = lm(I(log(cost)) ~ I(log(output)) + I(log(output)^2) + I(log(price)) + load, USAirlines)
+summary(costEq)
+
+```
+
+Above is the summary output of regressing cost on the logs of output, output squared, fuel price, and on the load utilitzation. All coefficients are significant at the $5\%$ level of significance as well as being economically significant.
+
+Based on the coefficients for the output index, we can see that $1\%$ increase in the output index is associated with a $0.95\%$ percent increase in costs plus $0.02\%$ percent for each $1\%$ increase in the output index, all else equal. This shows that there are increasing marginal returns to costs so that the airlines costs increase faster the more output they have.
+
+As expected, the coefficient on fuel price is positive. This coefficient indicates that a $1\%$ increase in fuel price is associated with a $0.46\%$ increase in costs, all else equal. Again, this is not suprising. Fuel is an input for air travel and as the costs of inputs go up, one would expect overall cost to increase.
+
+Finally, the coefficient on load utilization is negative. This means that the more load capacity an airline ues, the lower costs will be. More specifically, a 0.01 increase in load capacity utilization is associated with a $0.015\%$ decrease in cost, all else equal. This means that airlines can drive down costs by utilizing more of the capacity of each plane in their fleet. If they utilize each plane more, they can presumably fly fewer planes and use less fuel.
+
+#### (d) Now re-estimate the model to account for (1) time effects only, (2) firm effect only, and (3) both firm and time effects. How do the results differ?
+
+```{r mylatextable, results = "asis"}
+
+costEqTime = lm(I(log(cost)) ~ I(log(output)) + I(log(output)^2) + I(log(price)) + load + factor(year), USAirlines)
+costEqFirm = lm(I(log(cost)) ~ I(log(output)) + I(log(output)^2) + I(log(price)) + load + factor(firm), USAirlines)
+costEqTF = lm(I(log(cost)) ~ I(log(output)) + I(log(output)^2) + I(log(price)) + load + factor(year) + factor(firm), USAirlines)
+
+summary(costEqTime)
+summary(costEqFirm)
+summary(costEqTF)
+#stargazer(costEqTime, costEqFirm, costEqTF, type = "latex")
+```
+
+After adding year effects, the coefficients on the cost terms decrease slightly and the coeffcient on log output squared becomes less significant relative to our original model. Load also decreases making capacity utilization even more effective in cost savings. The interesting difference of adding year fixed effects is that the coefficient on fuel price becomes negative. Given that it is not statistically significant, however, it is probably safe to assume that including year effects makes the effect of the price itself negligible. The most likely reason for this difference is that changes in fuel prices are likely to be heavily influenced by time. Therefore, including the year effects pulled all of the effect out of the price variable and made it insignificant.
+
+If we include firm effects without year effects, the coefficients on the output terms increase and remain significant and the coefficients on price and load decrease and remain significant. The only firm effect, relative to firm 1, that is significant is firm 3. Firm 3 has $24\%$ lower costs on average, relative to the other firms holding all else constant.
+
+Including both year and firm effects cause significant changes in the coefficients. The magnitude of the output coefficients decrease appreciably and the coefficient on the squared output term becomes insignificant. Price remains positive but decreased significantly and became insignificant. The magnitude of the load coefficient remained positive and significant, but decreased significantly relative to the original model. These results make sense. Including firm effects could plausibly bring down the effect of output. It may be that larger airlines are the ones facilitating the larger output and also have higher overall costs. By including firm effects in that scenario one could expect to see the relationship between output and cost to become more linear. The effect on the price coefficient also makes sense because fuel prices are likely to be heavily dependent on time and also because different size firms will be more or less impacted by changes in fuel prices depending on how large they are and how many other expenses they incur individually.
+
+Finally, the coefficient on load remains negative and significent, but decreases relative to the original model. It could be that some of the effect contained in the load coefficient of the original model is pulled into the firm and year effects. This could mean that over time airplane technology and design improved and enabled higher load utilization and that each firm chooses to include different sized airplanes in their respective fleets.
+
+#### (f) Re-estimate the model to account for random effects.
+
+```{r}
+
+USAirlines$lnCost = log(USAirlines$cost)
+costRand = plm(lnCost ~ I(log(output)) + I(log(output)^2) + I(log(price)) + load, data = USAirlines, index = c("firm", "year"), model = "random")
+summary(costRand)
+
+```
+
+
+
+
+
+# II. Wage Equation 
+
+Cornwell and Rupert's 1988 paper analyzes returns to schooling. The data set wage.csv contains 595 observations of individuals over a 7 year span.  
+
+Labor Market Data of Cornwell and Rupert (1988) consists of the following variables for 595 Individuals over 7 years:  
+
+EXP =Work experience  
+WKS =Weeks worked  
+OCC =Occupation, 1 if blue collar  
+IND =1 if manufacturing industry  
+SOUTH =1 if resides in south  
+SMSA =1 if resides in a city (SMSA)  
+MS =1 if married  
+FEM =1 if female  
+UNION =1 if wage set by union contract  
+ED =Years of education  
+BLK =1 if individual is black  
+LWAGE=Log of wage  
+
+### (a) Fit a regular OLS model to the data. Are there signs of heteroskedasticity? 
+
+```{r}
+
+# import data
+wage = read.csv("wage.csv")
+attach(wage)
+
+wage.ols = lm(LWAGE~BLK+ED+UNION+FEM+MS+SMSA+SOUTH+IND+OCC+EXPER+WKS,data=wage)
+summary(wage.ols)
+
+```
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(fitdistrplus)
+
+```
+
+
+# III. US Consumption 
+
+Use the data set USConsump1993 in the package AER. This should contain time series data on US income and consumption expenditure from 1950 - 1993.  
+
+```{r}
+
+library(AER)
+
+data("USConsump1993")
+uscmp = USConsump1993
+
+plot(uscmp[,1], type = "l", xlab = "Time", ylab = "USD",
+     main = "US Income and Consumption Expenditure")
+lines(uscmp[,2], col = "blue")
+legend("topleft", c("Income", "Consumption"), col = c("black", "blue"), lty = c(1,1))
+
+```
+
+
+#### (a) Calculate the investment in each time period (where investment is de???ned as the difference between income and expenditure).  
+
+
+```{r}
+
+inc = uscmp[,1]
+cmp = uscmp[,2]
+invest = inc - cmp
+
+t = seq(1950, 1993, length = length(inc))
+
+plot(x = t, y = inc, type = "l", xlab = "Time", ylab = "USD",
+     main = "US Income, Consumption, and Investment Expenditure",
+     ylim = c(0, 15000))
+lines(cmp, col = "blue")
+lines(invest, col = "green")
+legend("topleft", c("Income", "Consumption", "Investment"), col = c("black", "blue", "green"), 
+       lty = c(1,1,1))
+
+```
+
+
+### (b) Calculate the summary statistics of each variable, and estimate the underlying distributions. 
+
+
+```{r}
+
+summary(inc)
+summary(cmp)
+summary(invest)
+
+```
+
+```{r}
+
+y.lim = c(0,15000)
+
+par(mfrow=c(1,3))
+boxplot(inc, main = "Income", ylim = y.lim)
+boxplot(cmp, main = "Consumption", ylim = y.lim)
+boxplot(invest, main = "Investment", ylim = y.lim)
+
+par(mfrow=c(1,3))
+boxplot(inc, main = "Income")
+boxplot(cmp, main = "Consumption")
+boxplot(invest, main = "Investment")
+
+```
+
+
+
+
+```{r}
+
+# plot histogram of US Income data
+hist(inc, breaks = "FD", probability = TRUE, col = "skyblue2", 
+     main = "Histogram of US Income 1950-1993")
+lines(density(inc), col = "red")
+rug(inc)
+
+# compute descriptive parameters of an empirical distribution to the data
+descdist(as.numeric(inc), boot = 1000)
+
+# fit a distribution to the data 
+inc.fit = fitdist(as.numeric(inc), "unif")
+par(mfrow=c(2,2))
+plot.legend = c("Uniform")
+denscomp(inc.fit, legendtext = plot.legend)
+qqcomp(inc.fit, legendtext = plot.legend)
+cdfcomp(inc.fit, legendtext = plot.legend)
+ppcomp(inc.fit, legendtext = plot.legend)
+
+```
+
+
+```{r}
+
+# plot histogram of US Consumption Expenditure data
+hist(cmp, breaks = "FD", probability = TRUE, col = "skyblue2", 
+     main = "Histogram of US Consumption Expenditure 1950-1993")
+lines(density(cmp), col = "red")
+rug(cmp)
+
+# compute descriptive parameters of an empirical distribution to the data
+descdist(as.numeric(cmp), boot = 1000)
+
+# fit a distribution to the data 
+cmp.fit = fitdist(as.numeric(cmp), "unif")
+par(mfrow=c(2,2))
+plot.legend = c("Uniform")
+denscomp(cmp.fit, legendtext = plot.legend)
+qqcomp(cmp.fit, legendtext = plot.legend)
+cdfcomp(cmp.fit, legendtext = plot.legend)
+ppcomp(cmp.fit, legendtext = plot.legend)
+
+```
+
+
+```{r}
+
+# plot histogram of US Investment data
+hist(invest, breaks = "FD", probability = TRUE, col = "skyblue2", 
+     main = "Histogram of US Investment 1950-1993")
+lines(density(invest), col = "red")
+rug(invest)
+
+# compute descriptive parameters of an empirical distribution to the data
+descdist(as.numeric(invest), boot = 1000)
+
+# fit a distribution to the data 
+invest.fit = fitdist(as.numeric(invest), "unif")
+par(mfrow=c(2,2))
+plot.legend = c("Uniform")
+denscomp(invest.fit, legendtext = plot.legend)
+qqcomp(invest.fit, legendtext = plot.legend)
+cdfcomp(invest.fit, legendtext = plot.legend)
+ppcomp(invest.fit, legendtext = plot.legend)
+
+```
+
+All three of our variables appear to follow a uniform distribution. 
+
+
+
+### (c) Regress income on expenditure using a regular OLS model. 
+
+
+We are regressing US income on US consumption expenditure using yealy data from 1950 - 1993. 
+
+```{r}
+
+data = cbind(inc, cmp, invest)
+
+mod1 = lm(inc ~ cmp, data = data)
+summary(mod1)
+
+```
+
+We notice from the regression output that the coefficient for US consumption expenditure (cmp) is statistically significant at the 99% level. The estimate is 1.088, which indicates that on average we would expect to see that an increase of one unit of consumption expenditure to increase income by 1.008 units. We also see that the adjusted $R^2$ is 0.99. 
+
+
+
+### (d) Now calculate a two stage least squares regression, using investment as an instrumental variable. Interpret the results. 
+
+
+
+```{r}
+
+# Stage 1: regress independent variable (cmp) on instrument (invest)
+
+stage1 = lm(cmp ~ invest, data = data)
+summary(stage1)
+
+# Save the fitted values of (cmp) from stage 1 regression
+cmp.hat = fitted(stage1)
+data = cbind(data, cmp.hat)
+
+```
+
+
+```{r}
+
+# Stage 2: regress dependent variable on fitted values from stage 1 regression
+
+stage2 = lm(inc ~ cmp.hat, data = data)
+summary(stage2)
+
+```
+
+
+```{r}
+
+cor(cmp.hat, residuals(mod1)) # cor(z,u) cor btw instrument and errors from original regression
+
+cor(cmp, cmp.hat) # cor(x,z) cor btw independent variable and instrument
+
+```
+
+
+
+```{r}
+
+# using ivreg funtion to fit instrumental variable regression by tow-stage least squares
+
+iv.reg = ivreg(inc ~ cmp | invest, data = data)
+summary(iv.reg)
+
+```
+
+
+# IV
+
+
+```{r}
+
+library(wooldridge)
+data("fertil1")
+
+#base includes east, white, farm, 1974
+mod1 = lm(kids~educ+age+I(age^2)+black+northcen+west+othrural+town+smcity+y76+y78+y80+y82+y84)
+summary(mod1)
+
+
+#if years of education increase then it will decrease the number of kids you have
+#In later years (82, 84) the number of kids decreased a lot meaning that there was a significant secular change
+
+
+```
+
+
+#### (b)
+
+
+```{r}
+
+#(b)
+
+
+#first carry out education regression
+
+iv1 = lm(educ~meduc+feduc+age+I(age^2)+black+northcen+west+othrural+town+smcity+y76+y78+y80+y82+y84)
+summary(iv1)
+
+edhat = iv1$fitted.values
+
+mod2 = lm(kids~edhat+age+I(age^2)+black+northcen+west+othrural+town+smcity+y76+y78+y80+y82+y84)
+summary(mod2)
+
+
+#alternatively
+
+reg_iv1 <- ivreg(kids~educ+age+I(age^2)+black+northcen+west+othrural+town+smcity+y76+y78+y80+y82+y84|.-educ+meduc+feduc,data=fertil1)
+summary(reg_iv1)
+
+edhat1 = reg_iv1$fitted.values
+#so we know that our instruments are valid (Ftest being small and therefore rejecting null)
+
+
+
+cor(educ,meduc+feduc)
+cor(mod1$residuals,meduc+feduc)
+
+```
+
+
+#### (c)
+
+```{r}
+
+mod3 = lm(kids~age+I(age^2)+black+northcen+west+othrural+town+smcity+edhat*y76+edhat*y78+edhat*y80+edhat*y82+edhat*y84)
+summary(mod3)
+
+mod4 = lm(kids~edhat+age+I(age^2)+black+northcen+west+othrural+town+smcity+edhat:y76+edhat:y78+edhat:y80+edhat:y82+edhat:y84+y76+y78+y80+y82+y84)
+summary(mod4)
+
+mod5 = lm(kids~edhat+age+I(age^2)+black+northcen+west+othrural+town+smcity+edhat:y76+edhat:y78+edhat:y80+edhat:y82+edhat:y84)
+summary(mod5)
+
+mod1 = lm(kids~educ+age+I(age^2)+black+northcen+west+othrural+town+smcity+y76+y78+y80+y82+y84)
+summary(mod1)
+
+
+
+mod6 = lm(kids~edhat1+age+I(age^2)+black+northcen+west+othrural+town+smcity+edhat1:y76+edhat1:y78+edhat1:y80+edhat1:y82+edhat1:y84)
+summary(mod6)
+
+```
+
+
+
+
