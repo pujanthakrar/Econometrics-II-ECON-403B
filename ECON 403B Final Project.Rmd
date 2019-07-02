@@ -1,0 +1,1085 @@
+---
+title: "ECON 403B Final Project"
+author: "John Macke, Pujan Thakrar, Mark Vandre"
+date: "February 28, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r setup, include=FALSE, warning=F, message=F}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(quantmod)
+library(timeSeries)
+library(forecast)
+library(vars)
+library(Metrics)
+library(dplyr)
+library(tseries)
+
+
+```
+
+
+```{r}
+
+# import cpi full data
+full.cpi = getSymbols("CPIAUCSL", src  = "FRED", auto.assign = FALSE)
+full.cpi = Delt(full.cpi$CPIAUCSL, k = 12, type = "arithmetic")
+full.cpi = full.cpi * 100
+full.cpi = subset(full.cpi, index(full.cpi) >= "1994-01-01" & index(full.cpi) <= "2018-12-01")
+colnames(full.cpi) = paste(c("CPI.full"))
+
+# import cpi core data
+core.cpi = getSymbols("CPILFESL", src  = "FRED", auto.assign = FALSE)
+core.cpi = Delt(core.cpi$CPILFESL, k = 12, type = "arithmetic")
+core.cpi = core.cpi * 100
+core.cpi = subset(core.cpi, index(core.cpi) >= "1994-01-01" & index(core.cpi) <= "2018-12-01")
+colnames(core.cpi) = paste(c("CPI.core"))
+
+# import cpi food data
+food.cpi = getSymbols("CPIFABSL", src  = "FRED", auto.assign = FALSE)
+food.cpi = Delt(food.cpi$CPIFABSL, k = 12, type = "arithmetic")
+food.cpi = food.cpi * 100
+food.cpi = subset(food.cpi, index(food.cpi) >= "1994-01-01" & index(food.cpi) <= "2018-12-01")
+colnames(food.cpi) = paste(c("CPI.food"))
+
+# import cpi energy data
+energy.cpi = getSymbols("CPIENGSL", src  = "FRED", auto.assign = FALSE)
+energy.cpi = Delt(energy.cpi$CPIENGSL, k = 12, type = "arithmetic")
+energy.cpi = energy.cpi * 100
+energy.cpi = subset(energy.cpi, index(energy.cpi) >= "1994-01-01" & 
+                      index(energy.cpi) <= "2018-12-01")
+colnames(energy.cpi) = paste(c("CPI.energy"))
+
+# import cpi house data
+house.cpi = getSymbols("CPIHOSNS", src  = "FRED", auto.assign = FALSE)
+house.cpi = Delt(house.cpi$CPIHOSNS, k = 12, type = "arithmetic")
+house.cpi = house.cpi * 100
+house.cpi = subset(house.cpi, index(house.cpi) >= "1994-01-01" & 
+                      index(house.cpi) <= "2018-12-01")
+colnames(house.cpi) = paste(c("CPI.house"))
+
+# import cpi apparel data
+app.cpi = getSymbols("CPIAPPSL", src  = "FRED", auto.assign = FALSE)
+app.cpi = Delt(app.cpi$CPIAPPSL, k = 12, type = "arithmetic")
+app.cpi = app.cpi * 100
+app.cpi = subset(app.cpi, index(app.cpi) >= "1994-01-01" & 
+                      index(app.cpi) <= "2018-12-01")
+colnames(app.cpi) = paste(c("CPI.app"))
+
+# import cpi transportation data
+trans.cpi = getSymbols("CPITRNSL", src  = "FRED", auto.assign = FALSE)
+trans.cpi = Delt(trans.cpi$CPITRNSL, k = 12, type = "arithmetic")
+trans.cpi = trans.cpi * 100
+trans.cpi = subset(trans.cpi, index(trans.cpi) >= "1994-01-01" & 
+                      index(trans.cpi) <= "2018-12-01")
+colnames(trans.cpi) = paste(c("CPI.trans"))
+
+# import cpi medical care data
+med.cpi = getSymbols("CPIMEDSL", src  = "FRED", auto.assign = FALSE)
+med.cpi = Delt(med.cpi$CPIMEDSL, k = 12, type = "arithmetic")
+med.cpi = med.cpi * 100
+med.cpi = subset(med.cpi, index(med.cpi) >= "1994-01-01" & 
+                      index(med.cpi) <= "2018-12-01")
+colnames(med.cpi) = paste(c("CPI.med"))
+
+# import cpi recreation data
+rec.cpi = getSymbols("CPIRECSL", src  = "FRED", auto.assign = FALSE)
+rec.cpi = Delt(rec.cpi$CPIRECSL, k = 12, type = "arithmetic")
+rec.cpi = rec.cpi * 100
+rec.cpi = subset(rec.cpi, index(rec.cpi) >= "1994-01-01" & 
+                      index(rec.cpi) <= "2018-12-01")
+colnames(rec.cpi) = paste(c("CPI.rec"))
+
+# import cpi education and communication data
+ed.cpi = getSymbols("CPIEDUSL", src  = "FRED", auto.assign = FALSE)
+ed.cpi = Delt(ed.cpi$CPIEDUSL, k = 12, type = "arithmetic")
+ed.cpi = ed.cpi * 100
+ed.cpi = subset(ed.cpi, index(ed.cpi) >= "1994-01-01" & 
+                      index(ed.cpi) <= "2018-12-01")
+colnames(ed.cpi) = paste(c("CPI.ed"))
+
+# import cpi other goods and services data
+ot.cpi = getSymbols("CPIOGSSL", src  = "FRED", auto.assign = FALSE)
+ot.cpi = Delt(ot.cpi$CPIOGSSL, k = 12, type = "arithmetic")
+ot.cpi = ot.cpi * 100
+ot.cpi = subset(ot.cpi, index(ot.cpi) >= "1994-01-01" & 
+                      index(ot.cpi) <= "2018-12-01")
+colnames(ot.cpi) = paste(c("CPI.ot"))
+
+
+
+```
+
+
+
+```{r}
+
+# convert to data frame and combine into one object 
+
+full = data.frame(index(full.cpi), coredata(full.cpi))
+core = data.frame(index(core.cpi), coredata(core.cpi))
+food = data.frame(index(food.cpi), coredata(food.cpi))
+energy = data.frame(index(energy.cpi), coredata(energy.cpi))
+house = data.frame(index(house.cpi), coredata(house.cpi))
+app = data.frame(index(app.cpi), coredata(app.cpi))
+trans = data.frame(index(trans.cpi), coredata(trans.cpi))
+med = data.frame(index(med.cpi), coredata(med.cpi))
+rec = data.frame(index(rec.cpi), coredata(rec.cpi))
+ed = data.frame(index(ed.cpi), coredata(ed.cpi))
+ot = data.frame(index(ot.cpi), coredata(ot.cpi))
+
+
+CPI = cbind(full, core$CPI.core, food$CPI.food, energy$CPI.energy, house$CPI.house, 
+            app$CPI.app, trans$CPI.trans, med$CPI.med, rec$CPI.rec, ed$CPI.ed, ot$CPI.ot)
+colnames(CPI) = paste(c("Date", "CPI.full", "CPI.core", "CPI.food", "CPI.energy", "CPI.house", 
+                        "CPI.app", "CPI.trans", "CPI.med", "CPI.rec", "CPI.ed", "CPI.ot"))
+head(CPI)
+
+```
+
+
+
+```{r, fig.height=10}
+
+# convert to ts objects
+
+full.ts = ts(CPI$CPI.full, start = 1994, frequency = 12)
+core.ts = ts(CPI$CPI.core, start = 1994, frequency = 12)
+food.ts = ts(CPI$CPI.food, start = 1994, frequency = 12)
+energy.ts = ts(CPI$CPI.energy, start = 1994, frequency = 12)
+house.ts = ts(CPI$CPI.house, start = 1994, frequency = 12)
+app.ts = ts(CPI$CPI.app, start = 1994, frequency = 12)
+trans.ts = ts(CPI$CPI.trans, start = 1994, frequency = 12)
+med.ts = ts(CPI$CPI.med, start = 1994, frequency = 12)
+rec.ts = ts(CPI$CPI.rec, start = 1994, frequency = 12)
+ed.ts = ts(CPI$CPI.ed, start = 1994, frequency = 12)
+ot.ts = ts(CPI$CPI.ot, start = 1994, frequency = 12)
+
+t = seq(1994, 2018.918, length = length(full.ts))
+
+CPI.ts = cbind(full.ts, core.ts, food.ts, energy.ts, house.ts, app.ts, trans.ts, med.ts, rec.ts, 
+               ed.ts, ot.ts)
+
+
+```
+
+
+```{r}
+
+# testing of Hybrid Forecasting
+
+library(forecastHybrid)
+
+hmod = hybridModel(new.core1, weights = "equal")
+summary(hmod)
+
+plot(forecast(hmod))
+
+hmod$auto.arima
+
+
+```
+
+
+
+```{r}
+
+# creating table listing CPI components
+
+components = as.data.frame(c("Food & Beverages", "Housing", "Apparel", "Transportation", 
+                             "Medical Care", "Recreation", "Education & Communication", 
+                             "Other Goods & Services"))
+
+weights = as.data.frame(c(14.314, 42.202, 2.959, 16.348, 8.682, 5.694, 6.596, 3.204))
+
+components = cbind(components, weights)
+
+colnames(components) = paste(c("Full CPI Components", "Weights as % of Full CPI (2018)"))
+
+components
+
+```
+
+
+```{r, fig.height=8}
+
+# plotting Full and Core from 1960-2018
+
+# import cpi full data
+full.cpi2 = getSymbols("CPIAUCSL", src  = "FRED", auto.assign = FALSE)
+full.cpi2 = Delt(full.cpi2$CPIAUCSL, k = 12, type = "arithmetic")
+full.cpi2 = full.cpi2 * 100
+full.cpi2 = subset(full.cpi2, index(full.cpi2) >= "1960-01-01" & index(full.cpi2) <= "2018-12-01")
+colnames(full.cpi2) = paste(c("CPI.full"))
+
+# import cpi core data
+core.cpi2 = getSymbols("CPILFESL", src  = "FRED", auto.assign = FALSE)
+core.cpi2 = Delt(core.cpi2$CPILFESL, k = 12, type = "arithmetic")
+core.cpi2 = core.cpi2 * 100
+core.cpi2 = subset(core.cpi2, index(core.cpi2) >= "1960-01-01" & index(core.cpi2) <= "2018-12-01")
+colnames(core.cpi2) = paste(c("CPI.core"))
+
+# import cpi core data
+r = getSymbols("USREC", src  = "FRED", auto.assign = FALSE)
+r = subset(r, index(r) >= "1960-01-01" & index(r) <= "2018-12-01")
+colnames(r) = paste(c("recession"))
+
+
+USREC
+#par(mfrow=c(2,1))
+y.range2 = c(-5, 18)
+
+# plot(x = index(full.cpi2), 
+#      y = coredata(full.cpi2), 
+#      type = "l", 
+#      xlab = "Date", 
+#      ylab = "Percent Change", 
+#      col = "black", 
+#      lwd = 1,
+#      ylim = y.range2,
+#      main = "CPI Index Full")
+# abline(h = 0, col = "red")
+# 
+# 
+# plot(x = index(core.cpi2), 
+#      y = coredata(core.cpi2), 
+#      type = "l", 
+#      xlab = "Date", 
+#      ylab = "Percent Change", 
+#      col = "black", 
+#      lwd = 1,
+#      ylim = y.range2,
+#      main = "CPI Index Core")
+# abline(h = 0, col = "red")
+
+library(tis)
+
+par(mfrow=c(1,1))
+y.range2 = c(-5, 18)
+plot(x = index(full.cpi2), 
+     y = coredata(full.cpi2), 
+     type = "l", 
+     xlab = "Date", 
+     ylab = "Percent Change", 
+     col = "black", 
+     lwd = 1,
+     ylim = y.range2,
+     main = "CPI Full vs CPI Core")
+abline(h = 0, col = "red")
+lines(x = index(core.cpi2), 
+      y = coredata(core.cpi2), 
+      col = "blue")
+legend("topright", col = c("black", "blue"), c("Full CPI", "Core CPI"), lty = c(1,1))
+
+
+
+```
+
+
+
+```{r, fig.height=20}
+
+# individual series with same scale for y-axis
+par(mfrow=c(6,2))
+y.range = range(CPI[, 2:12])
+
+plot(x = CPI$Date, 
+     y = CPI$CPI.full, 
+     type = "l", 
+     xlab = "Date", 
+     ylab = "Percent Change", 
+     ylim = y.range, 
+     col = "black", 
+     lwd = 1,
+     main = "CPI Full")
+abline(h = 0, col = "red")
+
+plot(x = CPI$Date, 
+     y = CPI$CPI.core, 
+     type = "l", 
+     xlab = "Date", 
+     ylab = "Percent Change", 
+     ylim = y.range, 
+     col = "black", 
+     lwd = 1,
+     main = "CPI Core")
+abline(h = 0, col = "red")
+
+plot(x = CPI$Date, 
+     y = CPI$CPI.food, 
+     type = "l", 
+     xlab = "Date", 
+     ylab = "Percent Change", 
+     ylim = y.range, 
+     col = "black", 
+     lwd = 1,
+     main = "CPI Food & Beverages")
+abline(h = 0, col = "red")
+
+plot(x = CPI$Date, 
+     y = CPI$CPI.energy, 
+     type = "l", 
+     xlab = "Date", 
+     ylab = "Percent Change", 
+     ylim = y.range, 
+     col = "black", 
+     lwd = 1,
+     main = "CPI Energy")
+abline(h = 0, col = "red")
+
+plot(x = CPI$Date, 
+     y = CPI$CPI.house, 
+     type = "l", 
+     xlab = "Date", 
+     ylab = "Percent Change", 
+     ylim = y.range, 
+     col = "black", 
+     lwd = 1,
+     main = "CPI Housing")
+abline(h = 0, col = "red")
+
+plot(x = CPI$Date, 
+     y = CPI$CPI.app, 
+     type = "l", 
+     xlab = "Date", 
+     ylab = "Percent Change", 
+     ylim = y.range, 
+     col = "black", 
+     lwd = 1,
+     main = "CPI Apparel")
+abline(h = 0, col = "red")
+
+plot(x = CPI$Date, 
+     y = CPI$CPI.trans, 
+     type = "l", 
+     xlab = "Date", 
+     ylab = "Percent Change", 
+     ylim = y.range, 
+     col = "black", 
+     lwd = 1,
+     main = "CPI Transportation")
+abline(h = 0, col = "red")
+
+plot(x = CPI$Date, 
+     y = CPI$CPI.med, 
+     type = "l", 
+     xlab = "Date", 
+     ylab = "Percent Change", 
+     ylim = y.range, 
+     col = "black", 
+     lwd = 1,
+     main = "CPI Medical Care")
+abline(h = 0, col = "red")
+
+plot(x = CPI$Date, 
+     y = CPI$CPI.rec, 
+     type = "l", 
+     xlab = "Date", 
+     ylab = "Percent Change", 
+     ylim = y.range, 
+     col = "black", 
+     lwd = 1,
+     main = "CPI Recreation")
+abline(h = 0, col = "red")
+
+plot(x = CPI$Date, 
+     y = CPI$CPI.ed, 
+     type = "l", 
+     xlab = "Date", 
+     ylab = "Percent Change", 
+     ylim = y.range, 
+     col = "black", 
+     lwd = 1,
+     main = "CPI Education & Communication")
+abline(h = 0, col = "red")
+
+plot(x = CPI$Date, 
+     y = CPI$CPI.ot, 
+     type = "l", 
+     xlab = "Date", 
+     ylab = "Percent Change", 
+     ylim = y.range, 
+     col = "black", 
+     lwd = 1,
+     main = "CPI Other Goods & Services")
+abline(h = 0, col = "red")
+
+
+```
+
+
+
+```{r, fig.height=12}
+
+
+# plot all full, core, food, energy cpi index
+y.range = range(CPI[, 2:12])
+par(mfrow=c(1,1))
+
+plot(x = CPI$Date, 
+     y = CPI$CPI.full, 
+     type = "l", 
+     xlab = "Date", 
+     ylab = "Percent Change", 
+     ylim = y.range, 
+     col = "black", 
+     lwd = 2,
+     main = "CPI Indices")
+
+lines(x = CPI$Date,
+      y = CPI$CPI.core,
+      col = "blue",
+      lwd = 2)
+
+lines(x = CPI$Date,
+      y = CPI$CPI.food, 
+      col = "green", 
+      lwd = 1)
+
+lines(x = CPI$Date,
+      y = CPI$CPI.house,
+      col = "slateblue",
+      lwd = 1)
+
+lines(x = CPI$Date,
+      y = CPI$CPI.app,
+      col = "skyblue2",
+      lwd = 1)
+
+lines(x = CPI$Date,
+      y = CPI$CPI.trans,
+      col = "orange",
+      lwd = 1)
+
+lines(x = CPI$Date,
+      y = CPI$CPI.med,
+      col = "yellow",
+      lwd = 1)
+
+lines(x = CPI$Date,
+      y = CPI$CPI.rec,
+      col = "purple",
+      lwd = 1)
+
+lines(x = CPI$Date,
+      y = CPI$CPI.ed,
+      col = "gray60",
+      lwd = 1)
+
+lines(x = CPI$Date,
+      y = CPI$CPI.ot,
+      col = "brown",
+      lwd = 1)
+
+abline(h = 0, col = "red", lwd = 2)
+
+legend("topright", inset =  c(-0.2, 0), c("FULL", "CORE", "FOOD", "ENERGY"), 
+       col = c("black", "blue", "green", "gray60"),
+       lwd = c(1,1,1,1))
+
+
+item = c("Full", "Core", "Food", "Energy", "Housing", "Apparel", "Transportation", "Medical Care",
+         "Recreation", "Education & Communication", "Other")
+color = c()
+
+```
+
+
+$$ CPI_t = \sum_{i = 1}^{N}w_{i,t}CPI_{i,t}       $$
+
+
+$$ \pi_t =   \frac{CPI_t - CPI_{t-12}}{CPI_{t-12}}  $$
+
+
+
+```{r, fig.height=12}
+
+par(mfrow=c(2,1))
+acf(core.ts, lag.max = 50)
+pacf(core.ts, lag.max = 50)
+
+Box.test(core.ts, lag = 8)
+Box.test(core.ts, lag = 12)
+Box.test(core.ts, lag = 24)
+Box.test(core.ts, lag = 36)
+
+plot(stl(core.ts, s.window = "periodic"))
+
+
+m1 = auto.arima(core.ts)
+m1
+
+#------------
+
+# split core.ts into training (288) and testing (12)
+core.train = ts(core.ts[1:288], start = 1994, frequency = 12)
+core.test = ts(core.ts[289:300], start = 2018, frequency = 12)
+
+z = auto.arima(core.train)
+summary(z)
+
+
+m1 = Arima(core.train, order = c(2,0,0), seasonal = c(1,0,0), include.drift = TRUE)
+summary(m1)
+
+par(mfrow=c(3,1))
+acf(residuals(m1))
+pacf(residuals(m1))
+plot(residuals(m1), type = "l")
+abline(h = 0, col = "red")
+
+#---------------------
+# fit arima to core.ts and forecast 12 steps ahead, compare forecasted values to full.ts
+m2 = Arima(core.train, order = c(2,1,0), seasonal = c(1,0,0), include.drift = TRUE)
+summary(m2)
+
+par(mfrow=c(3,1))
+acf(residuals(m2))
+pacf(residuals(m2))
+plot(residuals(m2), type = "l")
+abline(h = 0, col = "red")
+
+plot(forecast(m2, h = 12))
+lines(fitted(m2), col = "red")
+legend("bottomleft", c("Actual", "Fitted", "Forecasted"), col = c("black", "red", "blue"), 
+       lty = c(1,1,1))
+
+m2.forecast = forecast(m2, h = 12)
+
+
+full.train = ts(full.ts[1:288], start = 1994, frequency = 12)
+full.test = ts(full.ts[289:300], start = 2018, frequency = 12)
+
+rmse(full.test, m2.forecast$mean)
+mape(full.test, m2.forecast$mean)
+
+zfor = forecast(z, h = 12)
+
+rmse(full.test, zfor$mean)
+mape(full.test, zfor$mean)
+
+
+```
+
+
+```{r}
+
+# RMSE of full on each of the components (the actual values for the components)
+
+r1 = rmse(actual = full.ts, predicted = food.ts)
+r2 = rmse(actual = full.ts, predicted = house.ts)
+r3 = rmse(actual = full.ts, predicted = app.ts)
+r4 = rmse(actual = full.ts, predicted = trans.ts)
+r5 = rmse(actual = full.ts, predicted = med.ts)
+r6 = rmse(actual = full.ts, predicted = rec.ts)
+r7 = rmse(actual = full.ts, predicted = ed.ts)
+r8 = rmse(actual = full.ts, predicted = ot.ts)
+
+rmse = rbind(r2, r1, r7, r6, r5, r8, r3, r4)
+
+components = c("Housing", "Food & Beverages", "Education & Communication", "Recreation", 
+               "Medical Care", "Other Goods & Services", "Apparel", "Transportation")
+
+table = as.data.frame(cbind(components, rmse))
+colnames(table) = paste(c("CPI Components", "RMSE"))
+rownames(table) = seq(1, nrow(table), 1)
+
+table
+
+
+
+```
+
+RMSE index = 77%
+MAPE Index = 60%
+
+```{r}
+
+# MAPE of full on each of the components (the actual values for the components)
+
+m1 = mape(actual = full.ts, predicted = food.ts)
+m2 = mape(actual = full.ts, predicted = house.ts)
+m3 = mape(actual = full.ts, predicted = app.ts)
+m4 = mape(actual = full.ts, predicted = trans.ts)
+m5 = mape(actual = full.ts, predicted = med.ts)
+m6 = mape(actual = full.ts, predicted = rec.ts)
+m7 = mape(actual = full.ts, predicted = ed.ts)
+m8 = mape(actual = full.ts, predicted = ot.ts)
+
+mape = rbind(m2, m1, m7, m6, m5, m8, m3, m4)
+
+components = c("Housing", "Food & Beverages", "Education & Communication", "Recreation", 
+               "Medical Care", "Other Goods & Services", "Apparel", "Transportation")
+
+table = as.data.frame(cbind(components, mape))
+colnames(table) = paste(c("CPI Components", "MAPE"))
+rownames(table) = seq(1, nrow(table), 1)
+
+table
+
+```
+
+
+
+```{r}
+
+# function
+new.core = CPI.ts[, 2:3]
+weight = c(.85686, .14314)
+
+
+# import cpi core data
+core.cpi2 = getSymbols("CPILFESL", src  = "FRED", auto.assign = FALSE)
+core.cpi2 = subset(core.cpi2, index(core.cpi2) >= "1993-01-01" & index(core.cpi2) <= "2018-12-01")
+colnames(core.cpi2) = paste(c("CPI.core"))
+core.cpi2 = ts(core.cpi2, start = 1993, frequency = 12)
+
+
+# import cpi food data
+food.cpi2 = getSymbols("CPIFABSL", src  = "FRED", auto.assign = FALSE)
+food.cpi2 = subset(food.cpi2, index(food.cpi2) >= "1993-01-01" & index(food.cpi2) <= "2018-12-01")
+colnames(food.cpi2) = paste(c("CPI.food"))
+food.cpi2 = ts(food.cpi2, start = 1993, frequency = 12)
+
+new.core2 = cbind(core.cpi2, food.cpi2)
+weight = c(.85686, .14314)
+
+
+inflation = function(data = data, weights = weights){
+  total = data.frame(total = rep(0,nrow(data)))
+  component = data.frame()
+  for(i in 1:length(weights)){
+    for(j in 1:nrow(data)){
+      component[j,1] = weights[i]*data[j,i]
+    }
+    total[,1]=total[,1]+component[,1]
+  }
+  for(m in 13:nrow(total)){
+    total[m,2] = 100*((total[m,1] - total[m-12,1])/total[m-12,1])
+  }  
+  total = total[-c(1:12),]
+  total = ts(total[,2], start = 1994, frequency = 12)
+  return(total)
+}
+
+new.core = inflation(data = new.core2, weights = weight)
+head(new.core, n = 24)
+
+plot(full.ts, main = "CPI Full Inflation & CPI New Core Inflation")
+lines(new.core, col = "blue")
+legend("bottomleft", col = c("black", "blue"), c("Full", "New Core"), lty = c(1,1))
+
+
+
+
+
+```
+
+
+
+```{r}
+
+# generating new series we will forecast with by using each component in our function
+
+# import cpi food data
+food.cpi = getSymbols("CPIFABSL", src  = "FRED", auto.assign = FALSE)
+food.cpi = subset(food.cpi, index(food.cpi) >= "1993-01-01" & index(food.cpi) <= "2018-12-01")
+colnames(food.cpi) = paste(c("CPI.food"))
+
+# import cpi house data
+house.cpi = getSymbols("CPIHOSNS", src  = "FRED", auto.assign = FALSE)
+house.cpi = subset(house.cpi, index(house.cpi) >= "1993-01-01" & 
+                      index(house.cpi) <= "2018-12-01")
+colnames(house.cpi) = paste(c("CPI.house"))
+
+# import cpi apparel data
+app.cpi = getSymbols("CPIAPPSL", src  = "FRED", auto.assign = FALSE)
+app.cpi = subset(app.cpi, index(app.cpi) >= "1993-01-01" & 
+                      index(app.cpi) <= "2018-12-01")
+colnames(app.cpi) = paste(c("CPI.app"))
+
+# import cpi transportation data
+trans.cpi = getSymbols("CPITRNSL", src  = "FRED", auto.assign = FALSE)
+trans.cpi = subset(trans.cpi, index(trans.cpi) >= "1993-01-01" & 
+                      index(trans.cpi) <= "2018-12-01")
+colnames(trans.cpi) = paste(c("CPI.trans"))
+
+# import cpi medical care data
+med.cpi = getSymbols("CPIMEDSL", src  = "FRED", auto.assign = FALSE)
+med.cpi = subset(med.cpi, index(med.cpi) >= "1993-01-01" & 
+                      index(med.cpi) <= "2018-12-01")
+colnames(med.cpi) = paste(c("CPI.med"))
+
+# import cpi recreation data
+rec.cpi = getSymbols("CPIRECSL", src  = "FRED", auto.assign = FALSE)
+rec.cpi = subset(rec.cpi, index(rec.cpi) >= "1993-01-01" & 
+                      index(rec.cpi) <= "2018-12-01")
+colnames(rec.cpi) = paste(c("CPI.rec"))
+
+# import cpi education and communication data
+ed.cpi = getSymbols("CPIEDUSL", src  = "FRED", auto.assign = FALSE)
+ed.cpi = subset(ed.cpi, index(ed.cpi) >= "1993-01-01" & 
+                      index(ed.cpi) <= "2018-12-01")
+colnames(ed.cpi) = paste(c("CPI.ed"))
+
+# import cpi other goods and services data
+ot.cpi = getSymbols("CPIOGSSL", src  = "FRED", auto.assign = FALSE)
+ot.cpi = subset(ot.cpi, index(ot.cpi) >= "1993-01-01" & 
+                      index(ot.cpi) <= "2018-12-01")
+colnames(ot.cpi) = paste(c("CPI.ot"))
+
+new = cbind(food.cpi, house.cpi, app.cpi, trans.cpi, med.cpi, rec.cpi, ed.cpi, ot.cpi)
+weight = c(.14314, .42202, .02959, .16348, .08682, .05694, .06596, .03204)
+
+new.core1 = inflation(data = new, weights = weight)
+new.core1 = ts(new.core1[,1], start = 1994, frequency = 12)
+
+plot(full.ts, main = "CPI Full Inflation & CPI New Core Inflation")
+lines(new.core1, col = "blue")
+legend("bottomleft", col = c("black", "blue"), c("Full", "New Core"), lty = c(1,1))
+
+
+
+```
+
+
+```{r, fig.height=12}
+
+
+
+par(mfrow=c(2,1))
+acf(new.core1, lag.max = 50)
+pacf(new.core1, lag.max = 50)
+
+new.core1 = ts(new.core1[,1], start = 1994, frequency = 12)
+
+plot(stl(new.core1, s.window = "periodic"))
+
+#---------------
+
+train.nc = new.core1[1:288]
+test.nc = new.core1[289:300]
+
+m4 = auto.arima(train.nc)
+summary(m4)
+
+# fit arima to core.ts and forecast 12 steps ahead, compare forecasted values to full.ts
+m3 = Arima(train.nc, order = c(1,1,0), seasonal = c(1,0,0), include.drift = TRUE)
+summary(m3)
+
+par(mfrow=c(3,1))
+acf(residuals(m3), main = "ACF of Residuals")
+pacf(residuals(m3), main = "PACF of Residuals")
+plot(residuals(m3), type = "l", main = "Residuals")
+abline(h = 0, col = "red")
+
+plot(forecast(m4, h = 12))
+lines(fitted(m4), col = "red")
+legend("bottomleft", c("Actual", "Fitted", "Forecasted"), col = c("black", "red", "blue"), 
+       lty = c(1,1,1))
+
+m2.forecast = forecast(m4, h = 12)
+m3.forecast = forecast(m3, h = 12)
+
+rmse(full.ts[289:300], m2.forecast$mean)
+rmse(full.ts[289:300], m3.forecast$mean)
+
+mape(full.ts[289:300], m3.forecast$mean)
+
+
+full.train = ts(full.ts[1:288], start = 1994, frequency = 12)
+full.test = ts(full.ts[289:300], start = 2018, frequency = 12)
+
+m4 = auto.arima(train.nc)
+f4 = forecast(m4, h = 12)
+rmse(full.ts[289:300], f4$mean)
+mape(full.ts[289:300], f4$mean)
+
+
+
+
+```
+
+```{r}
+
+# compare professional survey of forecasters forecast to ours 
+
+# our new index called : newcore1
+
+new.core1.qt = aggregate(new.core1, nfrequency = 4, FUN = mean)
+full.qt = aggregate(full.ts, nfrequency = 4, FUN = mean)
+
+# load SPF data
+spf = read.csv("SPF.csv", header = TRUE)
+tail(spf, n =10)
+
+spf = ts(spf[97:nrow(spf),4:5], start = 1994, frequency = 4)
+
+# quarter 1-4 of 2018 btw spf and full 
+rmse(full.qt[97:100], spf[97:100,1])
+
+mape(full.qt[97:100], spf[97:100,1])
+
+
+# plot
+plot(full.ts, xlim = c(1994, 2018.918))
+lines(fitted(m3), col = "blue", xlim = c(1994, 2018.918))
+
+
+plot(forecast(m3, h = 12))
+lines(fitted(m3), col = "red")
+lines(spf[,1], col = "green")
+legend("bottomleft", c("Actual", "Fitted", "Forecasted"), col = c("black", "red", "blue"), 
+       lty = c(1,1,1))
+
+fitted = as.data.frame(fitted(m3))
+predicted = as.data.frame(m3.forecast$mean)
+
+colnames(fitted) = paste(c("data"))
+colnames(predicted) = paste(c("data"))
+
+our.forecast = rbind2(fitted(m3), m3.forecast$mean)
+our.forecast= ts(our.forecast, start = 1994, frequency = 12)
+
+our.forecast = rbind2(fitted, predicted)
+our.forecast = ts(our.forecast, start = 1994, frequency = 12)
+our.forecast.qt = aggregate(our.forecast.qt, nfrequency = 4, FUN = mean)
+head(our.forecast.qt)
+
+
+fit.ts = ts(fitted(m3), start = 1994, frequency = 12)
+pred.ts = ts(m3.forecast$mean, start = 2018, frequency = 12)
+our = merge(fit.ts, pred.ts)
+
+
+
+
+
+
+
+
+
+```
+
+
+```{r}
+
+individual= read.csv("SFP Individual.csv", header = TRUE)
+head(individual)
+
+```
+
+
+```{r}
+
+# construct super index (top 5 components according to rmse)
+new.index = cbind(food.cpi, house.cpi, med.cpi, rec.cpi, ed.cpi)
+weights1 = c(weight[1], weight[2], weight[5], weight[6], weight[7])
+
+dem = sum(weights1)
+weights1 = weights1/dem
+weights1
+
+new.core3 = inflation(data = new.index, weights = weights1)
+
+plot(full.ts, main = "Full CPI Inflation & New CPI Metric & Core CPI Inflation")
+lines(new.core3, col = "blue")
+lines(core.ts, col = "green")
+legend("bottomleft", col = c("black", "blue", "green"), c("Full", "New Metric", "Core"), lty = c(1,1,1))
+
+par(mfrow=c(2,1))
+acf(new.core3, main = "ACF of New CPI Metric")
+pacf(new.core3,  main = "PACF of New CPI Metric")
+
+new.core3 = ts(new.core3[,1], start = 1994, frequency = 12)
+
+plot(stl(new.core3, s.window = "periodic"))
+
+
+m5 = auto.arima(new.core3)
+summary(m5)
+
+new.core3.train = new.core3[1:288]
+new.core3.test = new.core3[289:300]
+
+m6 = auto.arima(new.core3.train)
+summary(m6)
+
+m7 = Arima(new.core3.train, order = c(1,1,1), seasonal = c(0,0,0))
+summary(m7)
+
+plot(residuals(m7), main = "Residuals", xlab = "Time", ylab = "Resdiuals")
+acf(resdiuals(m7), main = "ACF")
+pacf(resdiuals(m7),  main = "PACF")
+
+m7.forecast = forecast(m7, h = 12)
+
+plot(forecast(m7, h = 12))
+lines(fitted(m7), col = "red")
+legend("bottomleft", c("Actual", "Fitted", "Forecasted"), col = c("black", "red", "blue"), 
+       lty = c(1,1,1))
+
+rmse(full.ts[289:300], m7.forecast$mean)
+mape(full.ts[289:300], m7.forecast$mean)
+
+
+
+
+```
+
+New Index by Weight in Basket. 
+
+```{r}
+
+# construct super index (top 5 components according to weight in basket)
+new = cbind(food.cpi, house.cpi, app.cpi, trans.cpi, med.cpi, rec.cpi, ed.cpi, ot.cpi)
+weight = c(.14314, .42202, .02959, .16348, .08682, .05694, .06596, .03204)
+
+
+
+new.index2 = cbind(food.cpi, house.cpi, trans.cpi, med.cpi, ed.cpi)
+weights2 = c(weight[1], weight[2], weight[4], weight[5], weight[7])
+
+dem2 = sum(weights2)
+weights2 = weights2/dem2
+weights2
+
+new.core4 = inflation(data = new.index2, weights = weights2)
+
+new.core4.train = new.core4[1:288]
+new.core4.test = new.core4[289:300]
+
+m8 = auto.arima(new.core4)
+
+m8.forecast = forecast(m8, h = 12)
+
+rmse(full.ts[289:300], m8.forecast$mean)
+mape(full.ts[289:300], m8.forecast$mean)
+
+```
+
+
+GARCH and ARIMA model
+
+```{r}
+
+# using GARCH model with arima
+
+library(rugarch)
+
+train.nc = new.core1[1:288]
+test.nc = new.core1[289:300]
+
+spec1=ugarchspec(variance.model=list(model="sGARCH"), mean.model=list(armaOrder=c(1,1)))
+fit1=ugarchfit(data= train.nc,spec=spec1) 
+show(fit1)
+
+f1 = ugarchforecast(fit1, n.ahead = 12)
+
+fitted.f1 = fitted(f1)
+
+rmse(full.ts[289:300], fitted.f1)
+mape(full.ts[289:300], fitted.f1)
+
+
+
+
+# Unconditional variance
+garchuncvar <- uncvariance(f1)
+
+# Predicted mean
+garchmean <- fitted(f1) 
+
+# Predicted volatilities
+garchvol <- sigma(fit1)
+plot(garchvol)
+
+
+
+```
+
+Seasonal stuff
+
+```{r}
+
+
+new.core1
+t = seq(1994,2018.918,length=length(new.core1))  
+
+sfit = tslm(new.core1 ~ season)        
+summary(sfit)  
+
+#Plot estimated seasonal factors
+plot(sfit$coefficients,type='l',ylab="Seasonal Factors",xlab="Season",
+     main="Figure 11.5: Plot of Seasonal Factors")
+
+```
+
+
+```{r}
+
+# ets model
+
+fit=ets(train.nc)
+
+a = forecast(fit, h = 12)
+
+plot(a)
+
+rmse(full.ts[289:300], a$mean)
+mape(full.ts[289:300], a$mean)
+
+hwfit<-HoltWinters(train.nc, gamma = FALSE)
+
+b = forecast(hwfit, h = 12)
+
+plot(b)
+
+rmse(full.ts[289:300], b$mean)
+mape(full.ts[289:300], b$mean)
+
+
+
+
+```
+
+
+```{r}
+
+# construct super index (top 5 components according to MAPE)
+# new = cbind(food.cpi, house.cpi, app.cpi, trans.cpi, med.cpi, rec.cpi, ed.cpi, ot.cpi)
+# weight = c(.14314, .42202, .02959, .16348, .08682, .05694, .06596, .03204)
+
+
+
+new.index3 = cbind(rec.cpi, app.cpi, ed.cpi, house.cpi, ot.cpi)
+weights3 = c(weight[6], weight[3], weight[7], weight[2], weight[8])
+
+dem3 = sum(weights3)
+weights3 = weights3/dem3
+weights3
+
+new.core5 = inflation(data = new.index3, weights = weights3)
+
+new.core5.train = new.core5[1:288]
+new.core5.test = new.core5[289:300]
+
+m9 = auto.arima(new.core5)
+
+m9.forecast = forecast(m9, h = 12)
+
+rmse(full.ts[289:300], m9.forecast$mean)
+mape(full.ts[289:300], m9.forecast$mean)
+
+```
+
+
+
+
+
+
